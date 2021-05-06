@@ -441,6 +441,54 @@ public class RestIntegrationTest {
                 });
     }
 
+    private HttpPut getCreateLayerRequest(String layerName) throws IOException {
+        final String url1 = "http://example.com/wms1?";
+        final String url2 = "http://example.com/wms2?";
+        final String layers = "remoteLayer";
+
+        final HttpPut request =
+                new HttpPut(jetty.getUri().resolve("rest/layers/").resolve(layerName + ".xml"));
+        request.setEntity(
+                new StringEntity(
+                        "<wmsLayer><name>"
+                                + layerName
+                                + "</name><wmsUrl><string>"
+                                + url1
+                                + "</string></wmsUrl><wmsLayers>"
+                                + layers
+                                + "</wmsLayers></wmsLayer>",
+                        ContentType.APPLICATION_XML));
+
+        return request;
+    }
+
+    private HttpDelete getDeleteLayerRequest(String layerName) throws Exception {
+        final HttpDelete request =
+                new HttpDelete(jetty.getUri().resolve("rest/layers/").resolve(layerName + ".xml"));
+
+        return request;
+    }
+
+    @Test
+    public void testSeedLayerWithDotInName() throws Exception {
+        String layerName = "states.my";
+
+        HttpPut createLayerRequest = getCreateLayerRequest(layerName);
+        try (CloseableHttpResponse response = admin.getClient().execute(createLayerRequest)) {
+            assertThat(response.getStatusLine(), hasProperty("statusCode", equalTo(200)));
+        }
+        try (CloseableHttpResponse response =
+                handleGet(URI.create("/geowebcache/rest/seed/" + layerName), admin.getClient())) {
+            assertEquals(200, response.getStatusLine().getStatusCode());
+
+        } finally {
+            HttpDelete deleteLayerRequest = getDeleteLayerRequest(layerName);
+            try (CloseableHttpResponse response = admin.getClient().execute(deleteLayerRequest)) {
+                assertThat(response.getStatusLine(), hasProperty("statusCode", equalTo(200)));
+            }
+        }
+    }
+
     @Test
     public void testCreateUpdateDelete() throws Exception {
         final String layerName = "testLayer";
@@ -450,18 +498,7 @@ public class RestIntegrationTest {
 
         // Create
         {
-            final HttpPut request =
-                    new HttpPut(jetty.getUri().resolve("rest/layers/").resolve(layerName + ".xml"));
-            request.setEntity(
-                    new StringEntity(
-                            "<wmsLayer><name>"
-                                    + layerName
-                                    + "</name><wmsUrl><string>"
-                                    + url1
-                                    + "</string></wmsUrl><wmsLayers>"
-                                    + layers
-                                    + "</wmsLayers></wmsLayer>",
-                            ContentType.APPLICATION_XML));
+            final HttpPut request = getCreateLayerRequest(layerName);
             try (CloseableHttpResponse response = admin.getClient().execute(request)) {
                 assertThat(response.getStatusLine(), hasProperty("statusCode", equalTo(200)));
             }
@@ -540,9 +577,7 @@ public class RestIntegrationTest {
         }
         // Delete
         {
-            final HttpDelete request =
-                    new HttpDelete(
-                            jetty.getUri().resolve("rest/layers/").resolve(layerName + ".xml"));
+            final HttpDelete request = getDeleteLayerRequest(layerName);
             try (CloseableHttpResponse response = admin.getClient().execute(request)) {
                 assertThat(response.getStatusLine(), hasProperty("statusCode", equalTo(200)));
             }
